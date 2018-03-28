@@ -8,15 +8,7 @@ editor_options:
   chunk_output_type: console
 ---
 
-```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE, 
-                      collapse = TRUE,
-                      message = FALSE,
-                      warning = FALSE,
-                      error = FALSE,
-                      comment = "#>",
-                      fig.path = "figures/", fig.align = "center")
-```
+
 
 These notes accompany a webinar given on March 28, 2018 on extracting and processing eBird data with the R package `auk`.
 
@@ -34,7 +26,8 @@ Once you have access to the data, proceed to the [download page](http://ebird.or
 
 Create a new RStudio project in a fresh directory, then create a new R script within this project. At the top of your script, load `auk` and any other necessary R packages. Also, create a variable to store the path to your EBD data files.
 
-```{r}
+
+```r
 library(tidyverse)
 library(sf)
 library(rnaturalearth)
@@ -48,17 +41,22 @@ ebd_dir <- "/Users/mes335/data/ebird/ebd_relFeb-2018" # change this!
 
 The full EBD is nearly 200 GB in size and takes multiple hours to process. For demonstration purposes several small subsets of the eBird data have been included in the `auk` package. They can be accessed using the `system.file()` command, which returns the path to package files. The first is a sample of 500 observations of Green, Gray, Blue, and Steller's Jays from North America:
 
-```{r ex-files}
+
+```r
 system.file("extdata/ebd-sample.txt", package = "auk")
+#> [1] "/Library/Frameworks/R.framework/Versions/3.4/Resources/library/auk/extdata/ebd-sample.txt"
 ```
 
 The second is suitable for producing zero-filled, presence-absence data. It contains every sighting from Singapore in 2012 of Collared Kingfisher, White-throated Kingfisher, and Blue-eared Kingfisher. The full Sampling Event Data file is also included, and contains all checklists from Singapore in 2012. These files can be accessed with:
 
-```{r ex-files-zf}
+
+```r
 # ebd
 system.file("extdata/zerofill-ex_ebd.txt", package = "auk")
+#> [1] "/Library/Frameworks/R.framework/Versions/3.4/Resources/library/auk/extdata/zerofill-ex_ebd.txt"
 # sampling event data
 system.file("extdata/zerofill-ex_sampling.txt", package = "auk")
+#> [1] "/Library/Frameworks/R.framework/Versions/3.4/Resources/library/auk/extdata/zerofill-ex_sampling.txt"
 ```
 
 ### The pipe `%>%`
@@ -81,7 +79,8 @@ Some rows in the EBD may have problematic characters in the comments fields that
 
 This process should be run on both the EBD and sampling event data. It typically takes several hours for the full EBD; however, it only needs to be run once because the output from the process is saved out to a new tab-separated text file for subsequent use. After running `auk_clean()`, you can delete the original, uncleaned data files to save space
 
-```{r clean, eval = FALSE}
+
+```r
 # ebd
 f <- file.path(ebd_dir, "ebd_relFeb-2018.txt")
 f_clean <- file.path(ebd_dir, "ebd_relFeb-2018_clean.txt")
@@ -96,17 +95,40 @@ auk_clean(f, f_out = f_sampling_clean, remove_text = TRUE)
 
 The EBD is huge! If we're going to work with it, we need to extract a manageable subset of the data. With this in mind, the main purpose of auk is to provide a variety of functions to define taxonomic, spatial, temporal, or effort-based filters. To get started, we'll use `auk_ebd()` to set up a reference to the EBD. We'll also provide a reference to the sampling event data. This step is optional, but it will allow us to apply exactly the same set of filters (except for taxonomic filters) to the sampling event data and the EBD. We'll see why this is valuable later.
 
-```{r auk-ebd}
+
+```r
 # define the paths to ebd and sampling event files
 f_in_ebd <- file.path(ebd_dir, "ebd_relFeb-2018_clean.txt")
 f_in_sampling <- file.path(ebd_dir, "ebd_sampling_relFeb-2018_clean.txt")
 # create an object referencing these files
 auk_ebd(file = f_in_ebd, file_sampling = f_in_sampling)
+#> Input 
+#>   EBD: /Users/mes335/data/ebird/ebd_relFeb-2018/ebd_relFeb-2018_clean.txt 
+#>   Sampling events: /Users/mes335/data/ebird/ebd_relFeb-2018/ebd_sampling_relFeb-2018_clean.txt 
+#> 
+#> Output 
+#>   Filters not executed
+#> 
+#> Filters 
+#>   Species: all
+#>   Countries: all
+#>   States: all
+#>   Spatial extent: full extent
+#>   Date: all
+#>   Start time: all
+#>   Last edited date: all
+#>   Protocol: all
+#>   Project code: all
+#>   Duration: all
+#>   Distance travelled: all
+#>   Records with breeding codes only: no
+#>   Complete checklists only: no
 ```
 
 Next we'll define some filters. Consult the [vignette](https://cornelllabofornithology.github.io/auk/articles/auk.html#defining-filters) to see all the possible ways we can filter the EBD, but for now we'll extract records from New Hampshire for Bicknell's Thrush and Swainson's Thrush from [complete](http://help.ebird.org/customer/portal/articles/1006361-are-you-reporting-all-species) checklists in June of any year.
 
-```{r filter-setup}
+
+```r
 ebd_filters <- auk_ebd(f_in_ebd, f_in_sampling) %>% 
   auk_species(c("Bicknell's Thrush", "Swainson's Thrush")) %>% 
   auk_state("US-NH") %>% 
@@ -116,17 +138,15 @@ ebd_filters <- auk_ebd(f_in_ebd, f_in_sampling) %>%
 
 The above code only defines the filters, no data has actually been extracted yet. To compile the filters into an AWK script and run it, use `auk_filter()`. Since I provided an EBD and sampling event file to `auk_ebd()`, both will be filtered and I will need to provide two output filenames. Note that I've stored the full EBD in a central location that can be accessed by many projects, but I save the extracted data into a subdirectory of the project folder. This ensures that the project is self-contained apart from the initial extraction of the data.
 
-```{r filter, eval = FALSE}
+
+```r
 f_out_ebd <- "data/ebd_thrush_nh.txt"
 f_out_sampling <- "data/ebd_thrush_nh_sampling.txt"
 ebd_filtered <- auk_filter(ebd_filters, file = f_out_ebd, 
                            file_sampling = f_out_sampling)
 ```
 
-```{r out-files, echo = FALSE}
-f_out_ebd <- "data/ebd_thrush_nh.txt"
-f_out_sampling <- "data/ebd_thrush_nh_sampling.txt"
-```
+
 
 Running `auk_filter()` takes a long time, typically a few hours, so you'll need to be patient. Also, since it's so time consuming, you'll likely only want to do this once in each project. With this in mind I'd keep the filtering code in a script of it's own, e.g. `01_ebd-extract.r`, then create a new script for all the processing and analysis steps. Here, for simplicity, I'll keep everything together in one file.
 
@@ -136,16 +156,62 @@ Now that we have an EBD extract of a reasonable size, we can read it in to an R 
 
 We'll put the sampling event data aside for now, and just read in the EBD:
 
-```{r read-ebd}
+
+```r
 ebd <- read_ebd(f_out_ebd)
 glimpse(ebd)
+#> Observations: 2,253
+#> Variables: 42
+#> $ checklist_id                 <chr> "S3910100", "S4263131", "S3936987...
+#> $ global_unique_identifier     <chr> "URN:CornellLabOfOrnithology:EBIR...
+#> $ last_edited_date             <chr> "2014-05-07 19:23:51", "2014-05-0...
+#> $ taxonomic_order              <dbl> 24602, 24600, 24600, 24602, 24602...
+#> $ category                     <chr> "species", "species", "species", ...
+#> $ common_name                  <chr> "Swainson's Thrush", "Bicknell's ...
+#> $ scientific_name              <chr> "Catharus ustulatus", "Catharus b...
+#> $ observation_count            <chr> "X", "1", "2", "1", "1", "2", "5"...
+#> $ breeding_bird_atlas_code     <chr> NA, NA, NA, NA, NA, NA, NA, NA, N...
+#> $ breeding_bird_atlas_category <chr> NA, NA, NA, NA, NA, NA, NA, NA, N...
+#> $ age_sex                      <chr> NA, NA, NA, NA, NA, NA, NA, NA, N...
+#> $ country                      <chr> "United States", "United States",...
+#> $ country_code                 <chr> "US", "US", "US", "US", "US", "US...
+#> $ state                        <chr> "New Hampshire", "New Hampshire",...
+#> $ state_code                   <chr> "US-NH", "US-NH", "US-NH", "US-NH...
+#> $ county                       <chr> "Grafton", "Grafton", "Coos", "Co...
+#> $ county_code                  <chr> "US-NH-009", "US-NH-009", "US-NH-...
+#> $ iba_code                     <chr> NA, NA, "US-NH_2408", "US-NH_2419...
+#> $ bcr_code                     <int> 14, 14, 14, 14, 14, 14, 14, 14, 1...
+#> $ usfws_code                   <chr> NA, NA, NA, NA, NA, NA, NA, NA, N...
+#> $ atlas_block                  <chr> NA, NA, NA, NA, NA, NA, NA, NA, N...
+#> $ locality_id                  <chr> "L722150", "L291562", "L295828", ...
+#> $ locality_type                <chr> "H", "H", "H", "H", "H", "H", "H"...
+#> $ latitude                     <dbl> 43.94204, 44.16991, 44.27132, 45....
+#> $ longitude                    <dbl> -71.72562, -71.68741, -71.30302, ...
+#> $ observation_date             <date> 2008-06-01, 2004-06-30, 2008-06-...
+#> $ time_observations_started    <chr> NA, NA, NA, "09:00:00", "08:00:00...
+#> $ observer_id                  <chr> "obsr50351", "obsr131204", "obsr1...
+#> $ sampling_event_identifier    <chr> "S3910100", "S4263131", "S3936987...
+#> $ protocol_type                <chr> "Incidental", "Incidental", "Inci...
+#> $ protocol_code                <chr> "P20", "P20", "P20", "P22", "P22"...
+#> $ project_code                 <chr> "EBIRD", "EBIRD", "EBIRD_BCN", "E...
+#> $ duration_minutes             <int> NA, NA, NA, 120, 180, 180, 180, 1...
+#> $ effort_distance_km           <dbl> NA, NA, NA, 7.242, 11.265, 11.265...
+#> $ effort_area_ha               <dbl> NA, NA, NA, NA, NA, NA, NA, NA, N...
+#> $ number_observers             <int> NA, 1, NA, 2, 2, 2, 2, 2, 2, 16, ...
+#> $ all_species_reported         <lgl> TRUE, TRUE, TRUE, TRUE, TRUE, TRU...
+#> $ group_identifier             <chr> NA, NA, NA, NA, NA, NA, NA, NA, N...
+#> $ has_media                    <lgl> FALSE, FALSE, FALSE, FALSE, FALSE...
+#> $ approved                     <lgl> TRUE, TRUE, TRUE, TRUE, TRUE, TRU...
+#> $ reviewed                     <lgl> FALSE, FALSE, FALSE, FALSE, FALSE...
+#> $ reason                       <chr> NA, NA, NA, NA, NA, NA, NA, NA, N...
 ```
 
 ### Pre-processing
 
 By default, two important pre-processing steps are performed to handle taxonomy and group checklists. In most cases, you'll want this to be done; however, these can be turned off to get the raw data.
 
-```{r read-ebd-raw}
+
+```r
 ebd_raw <- read_ebd(f_out_ebd, 
                     # leave group checklists as in
                     unique = FALSE,
@@ -179,13 +245,25 @@ type). Dropped by `auk_rollup()`.
 
 `auk` contains the full eBird taxonomy as a data frame.
 
-```{r tax}
+
+```r
 glimpse(ebird_taxonomy)
+#> Observations: 15,966
+#> Variables: 8
+#> $ taxon_order     <dbl> 3.0, 5.0, 6.0, 7.0, 13.0, 14.0, 17.0, 32.0, 33...
+#> $ category        <chr> "species", "species", "slash", "species", "spe...
+#> $ species_code    <chr> "ostric2", "ostric3", "y00934", "grerhe1", "le...
+#> $ common_name     <chr> "Common Ostrich", "Somali Ostrich", "Common/So...
+#> $ scientific_name <chr> "Struthio camelus", "Struthio molybdophanes", ...
+#> $ order           <chr> "Struthioniformes", "Struthioniformes", "Strut...
+#> $ family          <chr> "Struthionidae (Ostriches)", "Struthionidae (O...
+#> $ report_as       <chr> NA, NA, NA, NA, NA, "lesrhe2", "lesrhe2", NA, ...
 ```
 
 We can use one of the example datasets in the package to explore what `auk_rollup()` does.
 
-```{r}
+
+```r
 # get the path to the example data included in the package
 f <- system.file("extdata/ebd-rollup-ex.txt", package = "auk")
 # read in data without rolling up
@@ -195,7 +273,10 @@ ebd_w_ru <- auk_rollup(ebd_wo_ru)
 
 # all taxa not identifiable to species are dropped
 unique(ebd_wo_ru$category)
+#> [1] "domestic"   "form"       "hybrid"     "intergrade" "slash"     
+#> [6] "spuh"       "species"    "issf"
 unique(ebd_w_ru$category)
+#> [1] "species"
 
 # yellow-rump warbler subspecies rollup
 # without rollup, there are three observations
@@ -203,10 +284,20 @@ ebd_wo_ru %>%
   filter(common_name == "Yellow-rumped Warbler") %>% 
   select(checklist_id, category, common_name, subspecies_common_name, 
          observation_count)
+#> # A tibble: 3 x 5
+#>   checklist_id category common_name   subspecies_common_… observation_cou…
+#>   <chr>        <chr>    <chr>         <chr>               <chr>           
+#> 1 S41507433    species  Yellow-rumpe… <NA>                10              
+#> 2 S41507433    issf     Yellow-rumpe… Yellow-rumped Warb… 5               
+#> 3 S41507433    issf     Yellow-rumpe… Yellow-rumped Warb… 1
 # with rollup, they have been combined
 ebd_w_ru %>%
   filter(common_name == "Yellow-rumped Warbler") %>% 
   select(checklist_id, category, common_name, observation_count)
+#> # A tibble: 1 x 4
+#>   checklist_id category common_name           observation_count
+#>   <chr>        <chr>    <chr>                 <chr>            
+#> 1 S41507433    species  Yellow-rumped Warbler 16
 ```
 
 #### Group checklists
@@ -219,17 +310,81 @@ So far we've been working with presence-only data; however, many applications of
 
 Given an EBD file or data frame, and corresponding sampling event data, function `auk_zerofill()` produces zero-filled, presence-absence data.
 
-```{r zf}
+
+```r
 zf <- auk_zerofill(f_out_ebd, f_out_sampling)
 zf
+#> Zero-filled EBD: 12,938 unique checklists, for 2 species.
 zf$observations
+#> # A tibble: 25,876 x 4
+#>    checklist_id scientific_name    observation_count species_observed
+#>    <chr>        <chr>              <chr>             <lgl>           
+#>  1 G1003224     Catharus bicknelli 0                 FALSE           
+#>  2 G1003224     Catharus ustulatus X                 TRUE            
+#>  3 G1022603     Catharus bicknelli 0                 FALSE           
+#>  4 G1022603     Catharus ustulatus 0                 FALSE           
+#>  5 G1054429     Catharus bicknelli 3                 TRUE            
+#>  6 G1054429     Catharus ustulatus X                 TRUE            
+#>  7 G1054430     Catharus bicknelli 0                 FALSE           
+#>  8 G1054430     Catharus ustulatus X                 TRUE            
+#>  9 G1054431     Catharus bicknelli 1                 TRUE            
+#> 10 G1054431     Catharus ustulatus X                 TRUE            
+#> # ... with 25,866 more rows
 zf$sampling_events
+#> # A tibble: 12,938 x 29
+#>    checklist_id last_edited_date  country   country_code state  state_code
+#>    <chr>        <chr>             <chr>     <chr>        <chr>  <chr>     
+#>  1 S10836735    2014-05-07 19:19… United S… US           New H… US-NH     
+#>  2 S10936397    2014-05-07 19:03… United S… US           New H… US-NH     
+#>  3 S10995603    2014-05-07 19:03… United S… US           New H… US-NH     
+#>  4 S11005948    2012-06-19 12:40… United S… US           New H… US-NH     
+#>  5 S11013341    2012-06-20 18:26… United S… US           New H… US-NH     
+#>  6 S15136517    2013-09-10 08:16… United S… US           New H… US-NH     
+#>  7 S11012701    2017-06-12 06:31… United S… US           New H… US-NH     
+#>  8 S10995655    2012-06-17 19:56… United S… US           New H… US-NH     
+#>  9 S15295339    2014-05-07 18:59… United S… US           New H… US-NH     
+#> 10 S10932312    2014-05-07 18:45… United S… US           New H… US-NH     
+#> # ... with 12,928 more rows, and 23 more variables: county <chr>,
+#> #   county_code <chr>, iba_code <chr>, bcr_code <int>, usfws_code <chr>,
+#> #   atlas_block <chr>, locality_id <chr>, locality_type <chr>,
+#> #   latitude <dbl>, longitude <dbl>, observation_date <date>,
+#> #   time_observations_started <chr>, observer_id <chr>,
+#> #   sampling_event_identifier <chr>, protocol_type <chr>,
+#> #   protocol_code <chr>, project_code <chr>, duration_minutes <int>,
+#> #   effort_distance_km <dbl>, effort_area_ha <dbl>,
+#> #   number_observers <int>, all_species_reported <lgl>,
+#> #   group_identifier <chr>
 ```
 
 The resulting `auk_zerofill` object is a list of two data frames: `observations` stores the species' counts for each checklist and `sampling_events` stores the checklists. The `checklist_id` field can be used to combine the files together manually, or you can use the `collapse_zerofill()` function.
 
-```{r zf-collapse}
+
+```r
 collapse_zerofill(zf)
+#> # A tibble: 25,876 x 32
+#>    checklist_id last_edited_date  country   country_code state  state_code
+#>    <chr>        <chr>             <chr>     <chr>        <chr>  <chr>     
+#>  1 S10836735    2014-05-07 19:19… United S… US           New H… US-NH     
+#>  2 S10836735    2014-05-07 19:19… United S… US           New H… US-NH     
+#>  3 S10936397    2014-05-07 19:03… United S… US           New H… US-NH     
+#>  4 S10936397    2014-05-07 19:03… United S… US           New H… US-NH     
+#>  5 S10995603    2014-05-07 19:03… United S… US           New H… US-NH     
+#>  6 S10995603    2014-05-07 19:03… United S… US           New H… US-NH     
+#>  7 S11005948    2012-06-19 12:40… United S… US           New H… US-NH     
+#>  8 S11005948    2012-06-19 12:40… United S… US           New H… US-NH     
+#>  9 S11013341    2012-06-20 18:26… United S… US           New H… US-NH     
+#> 10 S11013341    2012-06-20 18:26… United S… US           New H… US-NH     
+#> # ... with 25,866 more rows, and 26 more variables: county <chr>,
+#> #   county_code <chr>, iba_code <chr>, bcr_code <int>, usfws_code <chr>,
+#> #   atlas_block <chr>, locality_id <chr>, locality_type <chr>,
+#> #   latitude <dbl>, longitude <dbl>, observation_date <date>,
+#> #   time_observations_started <chr>, observer_id <chr>,
+#> #   sampling_event_identifier <chr>, protocol_type <chr>,
+#> #   protocol_code <chr>, project_code <chr>, duration_minutes <int>,
+#> #   effort_distance_km <dbl>, effort_area_ha <dbl>,
+#> #   number_observers <int>, all_species_reported <lgl>,
+#> #   group_identifier <chr>, scientific_name <chr>,
+#> #   observation_count <chr>, species_observed <lgl>
 ```
 
 This zero-filled dataset is now suitable for applications such as species distribution modelling.
@@ -242,7 +397,8 @@ I'll work through some simple applications of the data we've just generated.
 
 One of the most obvious things to do with the presence data is make a map!
 
-```{r loc-map}
+
+```r
 # convert ebd to spatial object
 ebd_sf <- ebd %>% 
   select(common_name, latitude, longitude) %>% 
@@ -265,11 +421,14 @@ plot(ebd_sf %>% filter(common_name == "Bicknell's Thrush") %>% st_geometry(),
      col = "#377eb899", pch = 19, cex = 0.75, add = TRUE)
 ```
 
+<img src="figures/loc-map-1.png" style="display: block; margin: auto;" />
+
 ### Zero-filled data
 
 The above map doesn't account for effort. We can address this by using the zero-filled data to produce maps of frequency of observation on checklists. The EBD comes with a column for the county that the observation came from, so I'll use that to summarize these data.
 
-```{r freq-map, results = "hide"}
+
+```r
 # summarize over counties
 checklist_freq <- collapse_zerofill(zf) %>% 
   group_by(scientific_name, county_code) %>% 
@@ -293,3 +452,5 @@ ggplot(nh_counties) +
   theme(legend.position = "bottom",
         legend.key.width = unit(3,"line"))
 ```
+
+<img src="figures/freq-map-1.png" style="display: block; margin: auto;" />
