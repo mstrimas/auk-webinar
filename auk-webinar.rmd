@@ -14,7 +14,11 @@ knitr::opts_chunk$set(echo = TRUE,
                       fig.path = "figures/", comment = "#>")
 ```
 
-## Access the data
+These notes accompany a webinar given on March 28, 2018 on extracting and processing eBird data with the R package `auk`.
+
+## Getting started
+
+### Access the data
 
 Access to the full eBird dataset is provided via two large, tab-separated text files. The eBird Basic Dataset consist of one line for each observation of a species on a checklist. The Sampling Event Data consists of one line for each checklist.
 
@@ -22,26 +26,90 @@ To access eBird data, begin by [creating an eBird account and signing in](https:
 
 Once you have access to the data, proceed to the [download page](http://ebird.org/ebird/data/download/ebd). Download and uncompress (twice!) both the EBD and the corresponding Sampling Event Data. Put these two large text files somwhere sensible on either your computer's hard drive or an external drive, and remember the location of containing folder.
 
-## Project setup
+### Project setup
 
 Create a new RStudio project in a fresh directory, then create a new R script within this project. At the top of your script, load `auk` and any other necessary R packages. Also, create a variable to store the path to your EBD data files.
 
 ```{r}
 library(tidyverse)
 library(auk)
-data_dir <- "/Users/mes335/data/ebird/ebd_relFeb-2018" # change this!
+ebd_dir <- "/Users/mes335/data/ebird/ebd_relFeb-2018" # change this!
 ```
 
-```{r}
-ebd <- file.path(data_dir, "ebd_relFeb-2018_clean.txt") %>% 
-  auk_ebd() %>% 
-  auk_species(species = c("Gray Jay", "Blue Jay")) %>%
-  auk_country(country = c("US", "Canada")) %>%
-  auk_extent(extent = c(-100, 37, -80, 52)) %>%
-  auk_date(date = c("2012-01-01", "2012-12-31")) %>%
-  auk_time(start_time = c("06:00", "09:00")) %>%
-  auk_duration(duration = c(0, 60)) %>%
-  auk_complete()
-auk_filter(ebd, awk_file = "img/awk-example.txt", execute = FALSE)
+### Example datasets
+
+The full EBD is nearly 200 GB in size and takes multiple hours to process. For demonstration purposes several small subsets of the eBird data have been included in the `auk` package. They can be accessed using the `system.file()` command, which returns the path to package files. The first is a sample of 500 observations of Green, Gray, Bluem, and Stellar's Jays from North America:
+
+```{r ex-files}
+system.file("extdata/ebd-sample.txt", package = "auk")
 ```
+
+The second is suitable for producing zero-filled, presence-absence data. It contains every sighting from Singapore in 2012 of Collared Kingfisher, White-throated Kingfisher, and Blue-eared Kingfisher. The full Sampling Event Data file is also included, and contains all checklists from Singapore in 2012. These files can be accessed with:
+
+```{r ex-files-zf}
+# ebd
+system.file("extdata/zerofill-ex_ebd.txt", package = "auk")
+# sampling event data
+system.file("extdata/zerofill-ex_sampling.txt", package = "auk")
+```
+
+### The pipe `%>%`
+
+`%>%`, called the pipe operator, is extremely useful for making your code more readable; however, it takes a little getting used to. It "pipes"" its left-hand side value forward into the expressions that appears on the right-hand side, i.e. one can replace `f(x)` with `x %>% f()`. The pipe can be read as "then". For more details see the [chapter on pipes](http://r4ds.had.co.nz/pipes.html) in the R for Data Science book.
+
+## Using `auk`
+
+There are essentially five main tasks that `auk` is designed to accomplish, and we'll go through each in turn:
+
+1. Clean
+2. Filter
+3. Import
+4. Pre-process
+5. Zero-fill
+
+### Cleaning
+ 
+Some rows in the EBD may have problematic characters in the comments fields that will cause import errors and the dataset has an extra blank column at the end. The function `auk_clean()` drops these erroneous records and removes the blank column. In addition, you can use `remove_text = TRUE` to remove free text entry columns, including the comments and location and observation names. These fields are typically not required and removing them can significantly decrease file size. 
+
+This process should be run on both the EBD and sampling event data. It typically takes several hours for the full EBD; however, it only needs to be run once because the output from the process is saved out to a new tab-separated text file for subsequent use. After running `auk_clean()`, you can delete the original, uncleaned data files to save space
+
+```{r clean, eval = FALSE}
+# ebd
+f <- file.path(ebd_dir, "ebd_relFeb-2018.txt")
+f_clean <- file.path(ebd_dir, "ebd_relFeb-2018_clean.txt")
+auk_clean(f, f_out = f_clean)
+# sampling
+f_sampling <- file.path(ebd_dir, "ebd_sampling_relFeb-2018.txt")
+f_sampling_clean <- file.path(ebd_dir, "ebd_sampling_relFeb-2018_clean.txt")
+auk_clean(f, f_out = f_sampling_clean)
+```
+
+### Filtering
+
+```{r filter, eveal = FALSE}
+f_in_ebd <- file.path(ebd_dir, "ebd_relFeb-2018_clean.txt")
+f_in_sampling <- file.path(ebd_dir, "ebd_sampling_relFeb-2018_clean.txt")
+f_out_ebd <- "data/ebd_thrush_nh.txt"
+f_out_sampling <- "data/ebd_thrush_nh_sampling.txt"
+auk_ebd(f_ebd, f_sampling) %>% 
+  auk_species(c("Bicknell's Thrush", "Catharus ustulatus")) %>% 
+  auk_state("US-NH") %>% 
+  auk_date(c("2016-06-01", "2016-06-30")) %>% 
+  auk_protocol("Stationary") %>% 
+  auk_duration(c(0, 30)) %>% 
+  auk_time(c("5:00", "9:00")) %>% 
+  auk_complete() %>% 
+  auk_filter(file = f_out_ebd, file_sampling = f_out_sampling)
+```
+
+
+### Importing
+
+```{r import}
+auk_zerofill()
+```
+
+
+### Zero-filling
+
 
