@@ -1,0 +1,47 @@
+---
+title: "auk: working with eBird data in R"
+author: "Matthew Strimas-Mackey"
+output: md_document
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, 
+                      message = FALSE,
+                      warning = FALSE,
+                      error = FALSE,
+                      fig.path = "figures/", comment = "#>")
+```
+
+## Access the data
+
+Access to the full eBird dataset is provided via two large, tab-separated text files. The eBird Basic Dataset consist of one line for each observation of a species on a checklist. The Sampling Event Data consists of one line for each checklist.
+
+To access eBird data, begin by [creating an eBird account and signing in](https://secure.birds.cornell.edu/cassso/login). Then visit the [Download Data](http://ebird.org/ebird/data/download) page. eBird data access is free; however, you will need to [request access](http://ebird.org/ebird/data/request) in order to obtain access to the EBD. Filling out the access request form allows eBird to keep track of the number of people using the data and obtain information on the applications for which the data are used
+
+Once you have access to the data, proceed to the [download page](http://ebird.org/ebird/data/download/ebd). Download and uncompress (twice!) both the EBD and the corresponding Sampling Event Data. Put these two large text files somwhere sensible on either your computer's hard drive or an external drive, and remember the location of containing folder.
+
+## Project setup
+
+Create a new RStudio project in a fresh directory, then create a new R script within this project. At the top of your script, load `auk` and any other necessary R packages. Also, create a variable to store the path to your EBD data files.
+
+```{r}
+library(tidyverse)
+library(auk)
+data_dir <- "/Users/mes335/data/ebird/ebd_relFeb-2018" # change this!
+```
+
+```{r}
+ebd <- file.path(data_dir, "ebd_relFeb-2018_clean.txt") %>% 
+  auk_ebd() %>% 
+  auk_species(species = c("Gray Jay", "Blue Jay")) %>%
+  auk_country(country = c("US", "Canada")) %>%
+  auk_extent(extent = c(-100, 37, -80, 52)) %>%
+  auk_date(date = c("2012-01-01", "2012-12-31")) %>%
+  auk_time(start_time = c("06:00", "09:00")) %>%
+  auk_duration(duration = c(0, 60)) %>%
+  auk_complete()
+auk_filter(ebd, awk_file = "img/awk-example.txt", execute = FALSE)
+```
+
